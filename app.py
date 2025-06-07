@@ -57,6 +57,12 @@ country_factors = {
     "Custom": None
 }
 
+# Currency selection
+currency_options = {"USD": "$", "SGD": "S$", "MYR": "RM", "IDR": "Rp", "HKD": "HK$", "RMB": "¥"}
+st.sidebar.markdown("### 💱 Currency")
+selected_currency = st.sidebar.selectbox("Select Currency", options=list(currency_options.keys()), index=0)
+currency_symbol = currency_options[selected_currency]
+
 # Input Section
 st.header("🔧 Input Parameters")
 col1, col2, col3 = st.columns(3)
@@ -73,11 +79,8 @@ with col2:
         st.info(f"Using carbon factor for {selected_country}: {carbon_emission_factor} kg CO₂/kWh")
 
 with col3:
-    electricity_rate = st.number_input("Electricity Rate (SGD/kWh)", value=0.14)
+    electricity_rate = st.number_input(f"Electricity Rate ({currency_symbol}/kWh)", value=0.14)
     savings_percentage = st.number_input("Potential Energy Savings", value=8.8, format="%.2f") / 100
-
-currency = "SGD"
-roi_years = st.selectbox("Select ROI Duration", options=[3, 5])
 
 # Derived Calculations
 total_energy_before = energy_savings / savings_percentage if savings_percentage > 0 else 0
@@ -87,9 +90,9 @@ electricity_cost_after = energy_after * electricity_rate
 annual_co2_reduction = energy_savings * carbon_emission_factor
 
 # ROI Calculations
-initial_investment = st.number_input("One Time Onboarding Investment (SGD)", value=16000.0)
-software_fee = st.number_input("Annual Recurring Software Investment (SGD)", value=72817.0)
-years = roi_years
+initial_investment = st.number_input(f"One Time Onboarding Investment ({currency_symbol})", value=16000.0)
+software_fee = st.number_input(f"Annual Recurring Software Investment ({currency_symbol})", value=72817.0)
+years = st.slider("Select ROI Duration (Years)", min_value=3, max_value=10, value=5)
 annual_savings = energy_savings * electricity_rate
 cumulative_savings = []
 net_cash_flow = []
@@ -100,8 +103,7 @@ for i in range(years):
     net_cash_flow.append(net if i == 0 else net_cash_flow[-1] + net)
     cumulative_savings.append(net_cash_flow[-1])
 
-roi_label = f"Net Income ({roi_years}yrs)"
-net_income = round(cumulative_savings[roi_years - 1] / 1000)
+net_income_k = round(cumulative_savings[years-1] / 1000)
 payback_months = 0
 for i in range(years):
     if cumulative_savings[i] >= 0:
@@ -116,13 +118,13 @@ with metrics_col:
     st.markdown(f"""
     <div class=\"metric-box\">{annual_co2_reduction / 1000:.1f}<div class=\"metric-label\">tCO₂e/year<br>Carbon Reduction</div></div>
     <br>
-    <div class=\"metric-box\">{energy_savings / 1000:,.0f}k<div class=\"metric-label\">kWh/year<br>Energy Reduction</div></div>
+    <div class=\"metric-box\">{energy_savings / 1000:,.0f}k<div class=\"metric-label\">kWh/year<br>Energy Reduction <span title='Energy consumption saved annually compared to baseline.' style='font-size:14px;'>ℹ️</span></div></div>
     <br>
     <div class=\"metric-box\">{savings_percentage * 100:.1f}%<div class=\"metric-label\">Potential Energy Savings</div></div>
     <br>
     <div class=\"metric-box\">{int(payback_months):02d}<div class=\"metric-label\">Months<br>Payback Period</div></div>
     <br>
-    <div class=\"metric-box\">${net_income}k {currency}<div class=\"metric-label\">{roi_label}</div></div>
+    <div class=\"metric-box\">{net_income_k}k<div class=\"metric-label\">{selected_currency}<br>Net Income ({years}yrs)</div></div>
     """, unsafe_allow_html=True)
 
 with chart_col:
@@ -134,21 +136,21 @@ with chart_col:
                       margin=dict(l=20, r=20, t=30, b=30), showlegend=False, plot_bgcolor='white')
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader(f"💰 {roi_years}-Year ROI Forecast")
+    st.subheader(f"💰 {years}-Year ROI Forecast")
     fig2 = go.Figure()
     fig2.add_trace(go.Bar(x=list(range(years)), y=[annual_savings]*years, name="Annual Savings", marker_color="#10B981"))
     fig2.add_trace(go.Bar(x=list(range(years)), y=total_costs, name="Annual Costs", marker_color="#F87171"))
     fig2.add_trace(go.Scatter(x=list(range(years)), y=cumulative_savings, mode='lines+markers', name="Cumulative Net Savings", line=dict(color="#3B82F6")))
-    fig2.update_layout(barmode='group', height=400, xaxis_title='Year', yaxis_title=f'Cash Flow ({currency})',
+    fig2.update_layout(barmode='group', height=400, xaxis_title='Year', yaxis_title=f'Cash Flow ({selected_currency})',
                        plot_bgcolor='white', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig2, use_container_width=True)
 
     st.markdown(f"""
     <p style='font-size:14px; color:#555;'>
     📌 <b>Summary:</b><br>
-    Year 0: Initial onboarding + annual investment<br>
-    Year 1–{roi_years}: Annual recurring software investment compared to expected savings<br>
-    Cumulative savings shown in blue line.
+    Year 0: One-time onboarding investment + Year 1 software fee<br>
+    Year 1–{years}: Annual recurring software investment vs. energy savings<br>
+    Cumulative savings trend shown above.
     </p>
     """, unsafe_allow_html=True)
 
